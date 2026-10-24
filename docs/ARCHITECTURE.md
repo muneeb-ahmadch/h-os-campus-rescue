@@ -1,37 +1,32 @@
 # H-OS · Campus Rescue architecture
 
-Campus Rescue handles one synthetic event disruption: maintenance closes the Greenhouse, an agent proposes a suitable replacement, and an organizer approves the mock booking and message together.
+One synthetic workflow: room disruption or changed requirements → updated Brain → autonomous internal recovery brief → organizer-approved mock relocation and publication. A printable one-page version is served at `/architecture.html`.
 
 ```mermaid
 flowchart LR
-  UI[Browser · demo role selector] --> API[GET / POST /api/hos]
-  API --> Gate[Session + role capability checks]
-  Gate --> Brain[(D1 · session-scoped world)]
-  Notice[Synthetic maintenance notice] --> Librarian[Librarian · version / freshness / links]
-  Gate --> Librarian
-  Librarian --> Brain
-  Librarian --> Agent[Recovery agent · deterministic room rules]
-  Brain --> Agent
-  Agent --> Draft[Pending proposal + evidence fingerprint]
-  Draft --> Brain
-  Agent -. permitted evidence .-> Model[Optional hosted model · server-side API]
-  Model -. explanation + cited answers .-> Agent
-  Gate --> Approval[Organizer approval check]
-  Brain --> Approval
-  Approval --> Compare{Same fresh evidence?}
-  Compare -->|yes| Commit[Atomic mock room move + message]
-  Compare -->|no| Block[Invalidate or block · refresh / replan]
+  Notice[Untrusted event update] --> Model[Hosted model extracts typed requirements]
+  Model --> Review[Human reviews proposed values]
+  Review --> Lib[Librarian: version and freshness]
+  Closure[Synthetic maintenance notice] --> Lib
+  Lib --> Brain[(D1: event, rooms, sources, history)]
+  Brain --> Agent[Rules: check every room and rank eligible options]
+  Agent --> Brief[Autonomous internal brief]
+  Agent --> Plan[Proposal bound to evidence]
+  Plan --> Human[Organizer approves this proposal]
+  Human --> Gate{Same fresh evidence and eligible room?}
+  Gate -->|yes| Commit[Atomic mock booking + public update]
+  Gate -->|no| Block[Reject stale approval or unsafe recovery]
+  Brain --> Filter[Server role filter]
+  Filter --> Graph[Typed graph + cited answers + UI]
   Commit --> Brain
-  Brain --> Filter[Role-filtered dashboard / cited answers]
-  Filter --> UI
 ```
 
-**Brain and Librarian.** A browser session cookie selects a synthetic world in D1. The world contains the event, room inventory, versioned sources, proposal, and activity history. Sources carry visibility roles, timestamps, status, and version; seeded evidence expires after two hours of real time. Ingestion changes the evidence and refreshes the linked event state. Citations identify both a source and its version, so a reviewer can tell which evidence supported a proposal.
+**Brain.** D1 stores an isolated synthetic world per browser session. Versioned sources carry role visibility, freshness and history. A deterministic typed graph projects event/room/requirement/proposal relationships with source citations; its actual link count drives the UI. It is a structured knowledge projection, not a general-purpose graph database or vector retrieval system.
 
-**Agent and model boundary.** Code checks capacity, accessibility, required equipment, availability, and relevant policy before proposing a room. Optional server-side model calls provide recovery explanations and cited Q&A from permitted evidence. The proposed attendee message is deterministic. A real local Anthropic `claude-sonnet-5-5` Q&A call was verified on 24 October 2026; Gemini/Gemma and OpenRouter offer an open-model path that still needs verification. Model output cannot grant permissions, make an ineligible room eligible, approve a proposal, or execute an action. Missing credentials or provider failure produces a labeled rules-only result.
+**Librarian and model.** Maintenance and reviewed requirements create source versions. A hosted model interprets ordinary-language updates into bounded attendance/equipment values; extraction is read-only until an organizer reviews and applies it. The original notice remains internal evidence. Models also explain the prepared proposal and answer from fresh role-permitted sources. Invalid output is rejected; unavailable explanations and Q&A fall back visibly to rules. Interpretation fails visibly and offers structured controls. Citation validation proves envelope consistency, not semantic truth.
 
-**Approval and consistency.** A proposal records its evidence fingerprint and two draft actions. Approval requires the organizer demo role, a pending proposal, current evidence, and eligibility at execution time. A relevant update invalidates the old proposal; stale evidence blocks execution. Booking state, the public attendee message, and the executed-action record commit together. The API rejects an earlier proposal ID or repeated execution.
+**Agent.** After relevant ingestion, code checks availability, capacity, step-free access and equipment for every room. Among eligible rooms it prefers the lowest synthetic energy estimate. It autonomously saves a versioned internal working brief. It cannot remove accessibility requirements or execute a booking or publication. No eligible room means a blocked recovery, not a weaker policy.
 
-**Visibility and identity.** The server filters sources, operational activity, plans, and answers for the selected role. Organizers review recovery actions, facilities handles maintenance evidence, and attendees see public event information. The role selector intentionally impersonates these roles within the sandbox. It is not real authentication or membership verification. A hosted Sites access policy is a separate boundary and defaults to owner-private access.
+**Approval.** Each proposal records an evidence fingerprint. The organizer must approve its exact ID; fresh evidence, unchanged facts and room eligibility are rechecked. D1 compare-and-swap commits the two mock effects once. Updated facts invalidate previous approval. Three roles are filtered server-side; the role switch is deliberate demo impersonation, separate from hosted access.
 
-**Operating scope.** Vinext/React runs on a Cloudflare Worker with D1 (`DB`). There is no real booking service, mail service, people monitoring, or H-FARM connector. The demo is action-triggered, not a durable autonomous scheduler. Synthetic state, model prompts, and responses should be treated as demonstration data. See the README for local setup and the demo guide for verification scenarios.
+**Runtime and scope.** React/Vinext → Cloudflare Worker → D1. Provider keys stay server-side. There are no H-FARM connectors, real room bookings, messages, invoices, people monitoring or persistent background scheduler. The loop runs when a source action arrives. MIT-licensed original source; synthetic dataset; provider/model provenance displayed per result.

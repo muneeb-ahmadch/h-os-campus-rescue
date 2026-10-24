@@ -1,133 +1,111 @@
 # H-OS · Campus Rescue
 
-[Public source](https://github.com/muneeb-ahmadch/h-os-campus-rescue) · [Hosted preview (owner-private)](https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site)
-A campus event copilot that turns a last-minute room closure into a sourced recovery plan, then waits for an organizer to approve the consequential actions.
+[Live demo (access restricted)](https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site) · [Public source](https://github.com/muneeb-ahmadch/h-os-campus-rescue) · [Architecture](docs/ARCHITECTURE.md) · [Two-minute demo](docs/DEMO.md)
 
-This hackathon prototype uses a small synthetic campus. It does not connect to H-FARM systems, monitor people, book real rooms, or send real messages.
+**A campus that adapts when facts change, without reusing permission from an old decision.**
 
-## The demo
+Maintenance closes an event room. The Librarian versions the notice, the Brain links it to the affected event, and the agent checks every replacement. It autonomously saves an internal recovery brief. An organizer approves the specific mock room move and attendee announcement together. A changed requirement or stale source makes the old approval unusable.
 
-1. An event is scheduled in the Greenhouse.
-2. Facilities ingests a synthetic maintenance notice closing that room.
-3. The Librarian versions the evidence and links the closure to the event. The agent prepares an internal recovery proposal from eligible rooms.
-4. An organizer reviews the proposed room move, attendee message, and source citations.
-5. Approval atomically records the mock booking change and mock message. An attendee sees the resulting public event update.
+## Let the judge change the facts
 
-If relevant evidence changes, an earlier proposal becomes invalid. Stale evidence blocks execution until refreshed. Seeded sources expire after two hours of real time, so the freshness check also applies without a simulated update. The model generates the recovery explanation and cited answers. The proposed attendee message is deterministic, as are room eligibility, permission, approval validity, and execution.
+Start with **Simulate a room closure**, then try the live scenario controls:
 
-## Challenge coverage
-
-| Brief concept | Implementation |
+| Change | What the agent does |
 | --- | --- |
-| Brain | Versioned synthetic sources, event and room facts, source citations, and a linked activity history |
-| Librarian | Ingests maintenance updates, tracks freshness, and invalidates proposals when evidence changes |
-| Agent | Detects the disrupted event and prepares a recovery proposal using deterministic constraints |
-| Human approval | Organizer reviews a specific proposal before either mock action executes |
-| Three roles | Organizer, facilities, and attendee responses are filtered by the server |
-| Grounded answers | Answers include citations to permitted evidence; optional hosted model assistance is clearly labeled |
+| 48 attendees, projector and Wi-Fi | Proposes Agora; Studio 03 is too small, The Loft has no step-free access. |
+| 20 attendees, same equipment | Proposes Studio 03, the eligible room with the lowest synthetic energy estimate. |
+| 20 attendees and a whiteboard | Proposes Agora; Studio 03 lacks a whiteboard. |
+| 90 attendees | Blocks recovery. No eligible room fits; no outgoing message is drafted. |
+| Video conferencing required | Blocks recovery because none of the rooms provides it. |
+| A source changes after planning | Invalidates the proposal; its earlier approval ID cannot execute. |
+| Availability expires | Blocks until refreshed. Refreshing cannot fix insufficient capacity. |
 
-The role selector is deliberate **sandbox impersonation** for a single demo session. It demonstrates server-side data filtering and capability checks, but it is not enterprise authentication or proof that a visitor holds a real campus role. Each browser session has a separate synthetic world stored in D1.
+The controls accept custom attendance and equipment. Step-free access remains required. Every room has a full constraint matrix, with links back to source evidence. Energy figures are synthetic estimates for the event window, not measured savings.
+
+## Where Gemma matters
+
+**Gemma 4 `gemma-4-26b-a4b-it` through the Gemini API** interprets ordinary-language event updates into typed attendance/equipment requirements. Interpretation is read-only: the organizer reviews the actual values before applying them to the Brain. The original notice is preserved internally. The model also explains proposals and answers questions using fresh role-permitted sources.
+
+The model cannot change policy, waive accessibility, approve actions or execute bookings/messages. Unknown source IDs, inconsistent citation envelopes and uncited sentences are rejected. Comma-grouped references are normalized only when all IDs are permitted. These checks validate citation structure, not semantic truth. A failed explanation or Q&A call produces a visible rules-only fallback; failed extraction offers the structured controls.
+
+On **24 October 2026**, local real Gemma extraction and recovery explanations were verified. Extraction took about 2.1 seconds and successful explanations about 4–5 seconds in that run. These are observed samples, not a latency guarantee. A subsequent 24-request local HTTP run also verified cited Gemma Q&A. Hosted inference must be verified separately after deployment. Google's [Gemma API documentation](https://ai.google.dev/gemma/docs/core/gemma_on_gemini_api) documents the selected model.
+
+## What is actually implemented
+
+- **Brain:** versioned sources and a typed relationship projection, with evidence on every link. The UI counter is calculated from these links. The graph is derived from structured records, not an embedding index or general document crawler.
+- **Librarian:** ingests maintenance, interprets reviewed event updates, preserves source history and tracks expiry.
+- **Agent:** reacts to ingestion, evaluates availability/capacity/accessibility/equipment and writes its internal recovery brief autonomously.
+- **Approval:** source fingerprint and current eligibility are rechecked; D1 compare-and-swap commits the two mock effects together, once.
+- **Three roles:** organizer, facilities and attendee are filtered on the server before data, graph relationships or prompts are returned.
+
+The role switch is deliberate **sandbox impersonation**, not enterprise authentication. Every browser cookie session has a separate synthetic world. Hosted Site access is a separate boundary; the current audience is owner-restricted until explicitly changed.
 
 ## Run locally
 
-Prerequisites: Node.js **22.13.0 or newer**, npm, and an internet connection for the initial dependency install. No real campus credentials are required. A provider API key is optional for hosted model assistance.
-
-From this checkout:
+Requires Node.js **22.13.0+** and npm. No campus credentials are used.
 
 ```sh
 npm install
 npm run build
 ```
 
-Apply the included D1 migration once to the local preview database:
+Apply the included D1 migration once:
 
 ```sh
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_flashy_metal_master.sql
 ```
 
-Then start development:
+Create an ignored `.dev.vars` file:
+
+```dotenv
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your_key_here
+AI_MODEL=gemma-4-26b-a4b-it
+```
+
+Then run:
 
 ```sh
 npm run dev -- --hostname 127.0.0.1
 ```
 
-Open the URL printed by the server (normally `http://127.0.0.1:5173`). Development and the built preview share `.wrangler/state`. Apply each pending migration once; do not repeatedly replay already applied SQL.
+Open the printed URL, normally `http://127.0.0.1:5173`. Restart after changing `.dev.vars`. `npm start` previews the built Worker locally; it does not publish. Development and built preview share `.wrangler/state`.
 
-To preview the built Worker instead:
-
-```sh
-npm start
-```
-
-Use the URL printed by Wrangler. `npm start` is a local preview command; it does not publish a site. If source or bindings change, rebuild before previewing the built Worker. Generate future schema migrations with `npm run db:generate`.
-
-## Optional hosted model
-
-Create an ignored `.dev.vars` file in the project root. For an Anthropic prototype:
-
-```dotenv
-AI_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your_key_here
-AI_MODEL=claude-sonnet-5-5
-```
-
-For a Gemini-hosted Gemma model:
-
-```dotenv
-AI_PROVIDER=gemini
-GEMINI_API_KEY=your_key_here
-GEMMA_MODEL=your_verified_gemma_model_id
-```
-
-For an open model through OpenRouter:
-
-```dotenv
-AI_PROVIDER=openrouter
-AI_API_KEY=your_key_here
-AI_MODEL=your_verified_open_model_id
-```
-
-Configure one provider path and use a model ID actually available to that account. Keep secrets out of source control and out of browser code. Restart the local server after changing the file. Hosted Sites secrets must be configured through the hosting platform; a local `.dev.vars` file is not a deployment secret store.
-
-The model module makes provider calls server-side. The dashboard and answers distinguish configured model assistance from **rules-only** behavior. A configured key alone is not evidence of a successful model call: confirm that the returned plan or answer reports model use before claiming a live AI demo. With no usable key or a failed provider call, deterministic recovery still works and the interface reports the fallback.
-
-On **24 October 2026**, a real Anthropic `claude-sonnet-5-5` Q&A call was verified in the local setup: it returned `mode: "model"` with role-permitted `event-v1` and `announcement-v1` citations in about two seconds. This verifies that provider path locally; it does not establish hosted deployment access or open-model eligibility.
-
-**Challenge eligibility:** Claude is a closed model. An Anthropic-powered prototype alone does not establish an open-weight model requirement. Before submission, select an eligible open model, verify a successful call on the submitted instance, and record its exact model ID. The presence of the Gemini or OpenRouter integration alone does not prove eligibility.
+No key is needed for the structured scenario controls and policy engine. Gemini/Gemma is the verified open-model path. The server also has OpenRouter, Groq, Together and Anthropic adapters; their available model IDs must be checked with the relevant provider. A closed model does not establish an open-model prize requirement. Configure hosted secrets through the hosting platform, never in source or a browser bundle.
 
 ## Verify
 
 ```sh
 npm test
-npm run lint
 npm run typecheck
+npm run lint
 npm run build
 ```
 
-Verified on **24 October 2026**: `npm test` passes all **19 tests**, covering the domain engine, model response validation and fallback, provenance labeling, D1 session isolation, and concurrent approval consistency. Model adapter unit tests use mocked provider responses; the real Anthropic call above was a separate check.
+With the local server running, check a separate disposable synthetic session:
 
-Then follow the [90-second demo and failure cases](docs/DEMO.md). In particular, verify that facilities cannot approve, attendees receive only public evidence, stale evidence blocks approval, changed evidence invalidates an existing proposal, and repeated approval does not execute the mock actions twice. Passing a build does not establish those behaviors or prove a hosted model call succeeded.
+```sh
+npm run test:http
+# Also require real extraction, a recovery explanation and cited model Q&A:
+npm run test:http -- --with-model
+```
 
-## Project map
+Verified on 24 October 2026: **30 automated tests**, type checking, lint and production build passed. A **24-request live HTTP run** verified the loop with actual Gemma extraction, recovery explanations and cited Q&A.
 
-- `app/`: interface and API routes
-- `lib/contracts.ts`: shared dashboard and action types
-- `lib/model.ts`: optional hosted-model boundary
-- `db/` and `drizzle/`: D1 storage schema and migration
-- [Architecture](docs/ARCHITECTURE.md): trust boundaries and data flow
-- [Demo guide](docs/DEMO.md): judge walkthrough and edge cases
-- [Submission copy](docs/SUBMISSION.md): pitch and final verification fields
+The domain tests sweep attendance from **1 through 90** and cover missing equipment, no eligible room, source expiry, old approvals, role filtering, graph provenance, internal autonomous work, model validation and D1 concurrency. HTTP checks cover the complete loop through the real Worker API. The model unit tests mock providers; the `--with-model` HTTP run makes actual provider calls.
 
-## Scope and limitations
+## Submission materials
 
-This is a single-event hackathon sandbox. Sources are seeded or simulated, and execution updates only the sandbox. Room availability is a synthetic snapshot, not a campus scheduling integration. Session isolation is cookie-based; it is not organization membership management. The agent runs in response to demo actions rather than a durable background scheduler. Production use would require real identity and role assignments, verified source connectors, robust job handling, and separately authorized action integrations.
+- [Judge walkthrough and failure cases](docs/DEMO.md)
+- [One-page architecture source](public/architecture.html), served at `/architecture.html` and printable from the browser
+- [Architecture and trust boundaries](docs/ARCHITECTURE.md)
+- [Adversarial review and design choices](docs/RED-TEAM.md)
+- [Submission copy and remaining verification](docs/SUBMISSION.md)
 
-The app is prepared for Sites hosting with a Cloudflare Worker and D1 binding named `DB`. It has not yet been deployed. Hosted access is private to the owner by default: judges need an explicit access grant or an intentionally public setting. Verify the deployed URL as a judge before submission. A public repository URL also remains to be confirmed. This README documents local execution, not a general production deployment procedure.
+Reset before each judge. The synthetic sources expire after two real hours. Demonstrate the role filter by opening the attendee view after approval; it contains only public evidence, with no recovery brief, maintenance bulletin or organizer budget.
 
-## License
+## Scope and license
 
-Original H-OS code and documentation are offered under [MIT](LICENSE). Third-party dependencies and vendored files retain their own licenses; see their package metadata and the license notices in `vendor/` and `scripts/vite/`.
+A single-event hackathon sandbox using synthetic records and mock actions. No H-FARM systems, real bookings/messages, invoices, people monitoring or scoring. No durable background agent or general-purpose document ingestion. Real deployment would need identity/role assignments, verified connectors and separately authorized integrations.
 
-## Validation
-
-Verified on 24 October 2026: 19 automated tests, TypeScript checks and production build passed; 18 HTTP checks covered role isolation, evidence updates and exactly-once approval. Browser review covered 1280, 653 and 390px layouts, source details, invalidation and completed mock recovery. Real Anthropic Q&A and recovery explanations returned source citations. Hosted access remains owner-private by default.
+Original source and documentation are [MIT licensed](LICENSE). Third-party packages and vendored files retain their own licenses and notices.

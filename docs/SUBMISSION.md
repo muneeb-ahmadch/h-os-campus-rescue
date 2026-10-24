@@ -6,41 +6,37 @@ H-OS · Campus Rescue
 
 ## One sentence
 
-A campus event copilot that turns a room closure into an evidence-backed recovery proposal, with human approval before mock booking and attendee communication.
+A campus brain that adapts to changing event requirements, explains every room decision, and binds human approval to the exact evidence behind a mock recovery.
 
-## Short description
+## Description
 
-Campus Rescue demonstrates a small H-OS loop around one understandable campus problem: maintenance closes the room for an upcoming event. Its Librarian versions the notice, links it to event and room facts, tracks freshness, and preserves citations. An agent checks deterministic room constraints and prepares a recovery proposal. An organizer approves the specific room move and attendee message together. If the supporting evidence changes, the old proposal is invalidated; stale evidence blocks execution.
+A last-minute room closure should not turn into scattered messages and guesswork. Campus Rescue connects one synthetic event, its room inventory, maintenance evidence and policy in a source-backed Brain. The Librarian versions changes and uses Gemma 4 to turn ordinary-language event updates into reviewable requirements. The agent checks every room, saves an internal recovery brief on its own, and proposes a concrete mock room move and announcement.
 
-Three demo roles show server-filtered views: facilities, organizer, and attendee. Optional hosted model assistance explains the plan and answers questions with citations. The attendee message is deterministic; server-side rules retain control over eligibility, permission, and execution. The sandbox uses synthetic data, isolated browser-session state, and mock actions. It has no real H-FARM integration or people monitoring.
+Change the attendance live: 20 people can use Studio 03, 48 need Agora, and 90 cannot be safely accommodated. Add a whiteboard or video conferencing and the decision changes again. The constraint matrix shows why every room passed or failed; accessibility is never traded away. A changed or expired source invalidates the previous approval. Only an organizer can commit the two mock consequential effects, together and once.
 
-## Why it matters
+Organizer, facilities and attendee views are filtered on the server, including model context and graph relationships. All records and energy figures are synthetic. No real H-FARM system is accessed, no real room is booked and no message is sent.
 
-The useful autonomy is the work before approval: recognizing a disruption, linking evidence, checking suitable alternatives, and preparing a concrete recovery. The organizer reviews a specific plan with traceable sources and a bounded execution step.
+## Why the open model is part of the workflow
 
-## Stack
+Gemma 4 `gemma-4-26b-a4b-it` runs through the Gemini API. Its Librarian task interprets unstructured updates into bounded typed facts; the reviewer sees the actual extracted values before applying them. It also supplies cited explanations and Q&A. Rules govern constraints, freshness, permission and execution independently of the model. Unavailable inference is visibly labeled rather than presented as successful AI.
 
-React and Vinext · TypeScript · Cloudflare Worker · Cloudflare D1 · optional hosted model API (Anthropic, Gemini/Gemma, or OpenRouter) · MIT license for original code and documentation.
+## Design choices and journey
 
-## Links and verified facts
+The first prototype had a fixed recovery and a hardcoded linked-facts counter. Adversarial review led to a real typed relationship projection, live changes that produce different room decisions, explicit autonomous internal work, and a no-safe-room case the agent refuses to bypass. We kept one complete workflow instead of adding speculative agents. See [the review](RED-TEAM.md).
 
-- **Judge-accessible demo:** Not deployed yet. Intended URL: [Campus Rescue](https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site). Verify deployment and grant judges access before submitting this link.
-- **Public source repository:** https://github.com/muneeb-ahmadch/h-os-campus-rescue
-- **Model actually used:** Anthropic `claude-sonnet-5-5` in the local prototype.
-- **Successful live model call verified:** Yes, 24 October 2026, real local Q&A returned `mode: "model"` with `event-v1` and `announcement-v1` citations in about two seconds. Hosted verification remains pending.
-- **Validation actually completed:** `npm test`: 19 passing tests covering engine, model validation/provenance, and D1 session/concurrent-approval behavior. [ADD FINAL LINT, TYPECHECK, BUILD, AND HTTP/DEMO RESULTS WHEN VERIFIED]
-- **Team:** Muneeb Ahmad (solo)
+## Links and facts
 
-The real local Claude call verifies the prototype's hosted-provider integration. Claude is closed and does not alone satisfy an open-weight requirement. Select and verify an eligible model before claiming that model-related challenge requirements are met. Describe any request that falls back as rules-only, and verify model access separately on the deployed instance.
+- Demo: https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site
+- Public MIT source: https://github.com/muneeb-ahmadch/h-os-campus-rescue
+- One-page architecture: `/architecture.html` on the demo, with its source in `public/architecture.html`.
+- Model: Google Gemma 4 `gemma-4-26b-a4b-it`, Gemini API; real local extraction and recovery explanations verified on 24 October 2026. Hosted result verification is recorded after deployment.
+- Team: Muneeb Ahmad, solo.
+- Stack: React/Vinext, TypeScript, Cloudflare Worker, D1, Gemini API.
 
-## Final submission checks
+## Final operational checks
 
-- Deploy and confirm the demo link works as a judge, including required sign-in or explicit access grants. Sites hosting is owner-private by default; an owner session is insufficient verification.
-- Confirm the repository is accessible and includes README, MIT license, source, architecture, and demo instructions.
-- Run the build and behavior checks, record actual results, and test the full reset-to-approval flow once on the submitted version.
-- Confirm that secrets, local state, private reference content, and generated archives are excluded from the repository.
-- Submit before **22:15 PKT on 24 October 2026**, the deadline confirmed by the participant.
-
-## Honest limits
-
-This is a single-event hackathon prototype with synthetic evidence and mock side effects. Demo role selection is impersonation, not enterprise authorization. It has no production booking/mail integrations, verified campus connectors, or durable background job processing. Hosted model availability and judge access must be checked on the submitted instance.
+1. Confirm final build and hosted inference results. Configuration alone is insufficient evidence.
+2. Verify the URL as a judge: the existing audience is restricted to the owner until explicitly changed. The repository is public.
+3. Reset and rehearse the [two-minute walkthrough](DEMO.md); keep local preview available.
+4. Confirm the host's cutoff. Work toward **22:00 PKT on 24 October 2026** because the organizer schedule lists 19:00 in Italy; the participant previously reported 19:15 / 22:15 PKT. The original event-page copy and PDF contain other date/time inconsistencies. Do not assume the later time is permission to submit late.
+5. Claim only categories supported by the submitted working build and the organizer's final rules. A numeric win probability is not measurable from the available information.

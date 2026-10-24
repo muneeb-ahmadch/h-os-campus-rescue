@@ -1,4 +1,4 @@
-import type { Activity, Answer, CampusAction, CampusEvent, Citation, Dashboard, Plan, Role, Room, Source } from './contracts';
+import type { Activity, Answer, CampusAction, CampusEvent, Citation, Dashboard, KnowledgeLink, Plan, Role, Room, RoomCheck, Source } from './contracts';
 
 export interface CampusState {
   revision: number;
@@ -49,7 +49,7 @@ export function createInitialState(date: string | Date = new Date()): CampusStat
       source('maintenance', 'Facilities status bulletin', 'No active room closures. All spaces are operational for the event window.'),
       source('budget', 'Organizer budget — private', 'Synthetic event contingency budget: €120. Internal cost code: CAMPUS-DEMO-048. Only organizers may access budget details.', ['organizer']),
       source('announcement', 'Published event announcement', 'Innovation Open Lab is confirmed in Greenhouse, 15:00–17:00. Step-free access is available.', EVERYONE),
-      source('policy', 'Campus relocation policy', 'A replacement room must be available for the full event, fit all 48 attendees, provide step-free access, projector and Wi-Fi. An organizer must approve a room change and attendee message. A source update or expired evidence invalidates an outstanding approval. Booking and notification actions are simulated; no message is sent to real people.'),
+      source('policy', 'Campus relocation policy', 'A replacement room must be available for the full event, fit the current attendance and equipment requirements in the event brief, and provide step-free access. Among eligible rooms, prefer the lowest estimated energy use. Accessibility is never traded for energy savings. Internal recovery briefs may be created automatically. An organizer must approve a room change and attendee message. A source update or expired evidence invalidates an outstanding approval. Booking and notification actions are simulated; no message is sent to real people.'),
     ],
     plan: null,
     activity: [{ id: 'seed', time: now, type: 'system', title: 'Campus Brain is ready', detail: 'Seven synthetic sources linked to one event, four rooms and the approval policy. Demo sandbox: roles are deliberate impersonation, not production identity.', citations: [], roles: INTERNAL }],
@@ -77,8 +77,8 @@ function addActivity(state: CampusState, type: Activity['type'], title: string, 
 function replaceSource(state: CampusState, kind: string, content: string, expiresAt?: string): Source {
   const previous = state.sources.filter(s => s.kind === kind).sort((a, b) => b.version - a.version)[0];
   state.sources.filter(s => s.kind === kind && s.status !== 'superseded').forEach(s => { s.status = 'superseded'; });
-  const version = previous.version + 1;
-  const source: Source = { ...previous, id: `${kind}-v${version}`, version, content, status: 'fresh', updatedAt: state.simTime, expiresAt: expiresAt ?? freshUntil(state.simTime) };
+  const version = (previous?.version ?? 0) + 1;
+  const source: Source = { ...(previous ?? { title: kind === 'intake' ? 'Reviewed event update' : 'Internal recovery brief', kind, roles: [...INTERNAL] }), id: `${kind}-v${version}`, version, content, status: 'fresh', updatedAt: state.simTime, expiresAt: expiresAt ?? freshUntil(state.simTime) };
   state.sources.push(source);
   return source;
 }
@@ -89,14 +89,20 @@ function invalidatePlan(state: CampusState, reason: string) {
     addActivity(state, 'approval', 'Previous approval invalidated', reason, state.plan.citations);
   }
 }
-function candidateReason(room: Room, state: CampusState): string {
-  if (!room.available) return 'Unavailable: active maintenance closure';
-  if (room.id === state.event.roomId) return 'Already assigned to this event';
-  if (room.capacity < state.event.attendees) return `Too small: ${room.capacity} seats for ${state.event.attendees} attendees`;
-  if (state.event.requiresAccessibility && !room.accessible) return 'No step-free access';
+export function roomChecks(room: Room, state: CampusState, date: string | Date = new Date()): RoomCheck[] {
+  const sources = currentSources(state, date);
+  const refs = (...kinds: string[]) => sources.filter(s => kinds.includes(s.kind)).map(cite);
   const missing = state.event.requiredEquipment.filter(item => !room.equipment.includes(item));
-  if (missing.length) return `Missing ${missing.join(', ')}`;
-  return 'Available · enough seats · step-free · equipment ready';
+  return [
+    { key: 'availability', label: 'Available', passed: room.available && room.id !== state.event.roomId, detail: !room.available ? 'Unavailable: active maintenance closure' : room.id === state.event.roomId ? 'Already assigned to this event' : `Free for ${state.event.start}–${state.event.end}`, citations: refs('bookings', 'maintenance') },
+    { key: 'capacity', label: 'Capacity', passed: room.capacity >= state.event.attendees, detail: `${room.capacity} seats / ${state.event.attendees} attendees`, citations: refs('event', 'rooms') },
+    { key: 'accessibility', label: 'Step-free', passed: !state.event.requiresAccessibility || room.accessible, detail: room.accessible ? 'Step-free access verified' : 'No step-free access', citations: refs('event', 'rooms', 'policy') },
+    { key: 'equipment', label: 'Equipment', passed: !missing.length, detail: missing.length ? `Missing ${missing.join(', ')}` : state.event.requiredEquipment.join(', '), citations: refs('event', 'rooms') },
+  ];
+}
+function candidateReason(room: Room, state: CampusState): string {
+  const checks = roomChecks(room, state, state.simTime);
+  return checks.filter(c => !c.passed).map(c => c.key === 'capacity' ? `Too small: ${c.detail}` : c.detail).join(' · ') || 'Available · enough seats · step-free · equipment ready';
 }
 export function draftPlan(state: CampusState, date: string | Date = new Date()): void {
   const now = stamp(date);
@@ -105,38 +111,70 @@ export function draftPlan(state: CampusState, date: string | Date = new Date()):
   invalidatePlan(state, 'The agent rebuilt its proposal from the current evidence.');
   const evidence = relevantSources(state, now);
   const stale = evidence.filter(s => s.status !== 'fresh');
-  const candidates = state.rooms.map(room => ({ roomId: room.id, name: room.name, eligible: candidateReason(room, state).startsWith('Available ·'), reason: candidateReason(room, state) }));
+  const missingEvidence = EVIDENCE.filter(kind => !evidence.some(s => s.kind === kind));
+  const duration = (Date.parse(`2000-01-01T${state.event.end}:00Z`) - Date.parse(`2000-01-01T${state.event.start}:00Z`)) / 3_600_000;
+  const candidates = state.rooms.map(room => ({ roomId: room.id, name: room.name, eligible: roomChecks(room, state, now).every(c => c.passed), reason: candidateReason(room, state), checks: roomChecks(room, state, now), ...(room.energyKw === undefined ? {} : { estimatedKwh: Math.round(room.energyKw * duration * 10) / 10 }) }));
   const eligible = state.rooms.filter(room => candidates.find(c => c.roomId === room.id)?.eligible).sort((a, b) => (a.energyKw ?? 100) - (b.energyKw ?? 100));
   const target = eligible[0];
-  const blocked = stale.length > 0 || !target;
-  const reason = stale.length ? `Evidence needs refresh: ${stale.map(s => s.title).join(', ')}.` : !target ? 'No room satisfies availability, capacity, accessibility and equipment policy.' : 'Greenhouse is closed for a facilities inspection during the event window.';
+  const evidenceBlocked = stale.length > 0 || missingEvidence.length > 0;
+  const blocked = evidenceBlocked || !target;
+  const disruption = state.rooms.find(room => room.id === state.event.roomId)?.available === false ? `${state.event.roomName} is closed for a facilities inspection during the event window.` : `${state.event.roomName} cannot meet the updated event requirements.`;
+  const reason = evidenceBlocked ? `Evidence needs refresh: ${[...stale.map(s => s.title), ...missingEvidence].join(', ')}.` : !target ? 'No room satisfies availability, capacity, accessibility and equipment policy. An organizer must change the event requirements or provide another space.' : disruption;
   const planId = id('plan', state);
   state.plan = {
     id: planId, status: blocked ? 'blocked' : 'pending', createdAt: now, fromRoom: state.event.roomName,
     toRoom: target?.name ?? 'No eligible room', toRoomId: target?.id ?? '', reason,
-    explanation: blocked ? reason : `Move Innovation Open Lab to ${target.name}. Its ${target.capacity} seats accommodate all 48 attendees; step-free access, projector and Wi-Fi meet policy. The current ledger shows it is available for 15:00–17:00. Organizer approval is required before either simulated action can run.`,
+    explanation: reason,
     modelUsed: false,
-    proposedMessage: target ? `Update for Innovation Open Lab: we’re moving to ${target.name}, ${target.building}. The time stays 15:00–17:00. Step-free access, projector and Wi-Fi are available. Please head to ${target.name}.` : '',
+    ...(blocked ? { blockReason: evidenceBlocked ? 'stale' as const : 'no_room' as const } : {}),
+    proposedMessage: !blocked && target ? `Update for ${state.event.title}: we’re moving to ${target.name}, ${target.building}. The time stays ${state.event.start}–${state.event.end}. Step-free access is available. Please head to ${target.name}.` : '',
     citations: evidence.map(cite), candidates,
     actions: [
-      { id: `${planId}:book`, label: 'Reserve Agora & release Greenhouse', status: 'draft', requiresApproval: true },
-      { id: `${planId}:notify`, label: 'Publish attendee update (mock)', status: 'draft', requiresApproval: true },
+      { id: `${planId}:book`, label: target ? `Reserve ${target.name} & release ${state.event.roomName}` : 'Room change blocked: no safe proposal', status: blocked ? 'cancelled' : 'draft', requiresApproval: true },
+      { id: `${planId}:notify`, label: 'Publish attendee update (mock)', status: blocked ? 'cancelled' : 'draft', requiresApproval: true },
     ], evidenceFingerprint: evidenceFingerprint(state, now),
   };
+  if (!blocked && target) {
+    state.plan.explanation = `Propose ${target.name} for ${state.event.title}: ${target.capacity} seats for ${state.event.attendees} attendees, step-free access, and ${state.event.requiredEquipment.join(', ')}. It is the lowest estimated-energy eligible room for ${state.event.start}–${state.event.end}. Both mock actions require organizer approval.`;
+  }
+  const brief = replaceSource(state, 'recovery', `Internal working brief for ${planId}. ${reason}\n${candidates.map(c => `${c.name}: ${c.eligible ? 'eligible' : 'excluded'}; ${c.reason}${c.estimatedKwh === undefined ? '' : `; estimated ${c.estimatedKwh} kWh for this event window`}.`).join('\n')}\n${blocked ? 'No booking or notification is authorized. Escalate the blocker.' : `Proposed room: ${target.name}. Booking and attendee message remain unexecuted until approval.`}\nEvidence: ${evidence.map(s => s.id).join(', ')}. Energy estimates are synthetic, not measured savings.`);
+  state.plan.internalBrief = cite(brief);
+  addActivity(state, 'agent', 'Internal recovery brief created autonomously', `Saved ${brief.id} in the internal working space under policy. No approval was requested for this reversible internal work.`, [cite(brief), ...evidence.map(cite)]);
   state.scenario = 'planned';
-  addActivity(state, 'agent', blocked ? 'Recovery paused: evidence gate' : 'Recovery plan prepared automatically', blocked ? reason : 'Compared four rooms against capacity, accessibility, equipment and current booking evidence. Two simulated actions are waiting for organizer approval.', state.plan.citations);
+  addActivity(state, 'agent', blocked ? 'Recovery paused: policy gate' : 'Recovery plan prepared automatically', blocked ? reason : `Compared ${state.rooms.length} rooms against capacity, accessibility, equipment and current booking evidence. Two simulated actions are waiting for organizer approval.`, state.plan.citations);
 }
 
 export function applyAction(input: CampusState, action: CampusAction, role: Role, date: string | Date = new Date()): CampusState {
   const now = stamp(date);
-  if (action.action === 'ask' || action.action === 'switch_role') throw new DomainError('Use the session or answer handler for this action.');
+  if (action.action === 'ask' || action.action === 'switch_role' || action.action === 'interpret_update') throw new DomainError('Use the session or answer handler for this action.');
   if (action.action === 'ingest' && role !== 'organizer' && role !== 'facilities') throw new DomainError('Only organizers and facilities can ingest sources.', 403);
   if (action.action === 'run_agent' && role !== 'organizer' && role !== 'facilities') throw new DomainError('This role cannot operate the recovery agent.', 403);
+  if (action.action === 'revise_event' && role !== 'organizer') throw new DomainError('Only organizers can revise the synthetic event requirements.', 403);
   if (['approve', 'reject', 'reset'].includes(action.action) && role !== 'organizer') throw new DomainError('Only the organizer can perform this action.', 403);
   if (action.action === 'reset') { const reset = createInitialState(now); reset.revision = input.revision + 1; return reset; }
   const state = structuredClone(input);
   state.simTime = now;
-  if (action.action === 'ingest') {
+  if (action.action === 'revise_event') {
+    if (state.event.status === 'relocated') throw new DomainError('Reset the demo before changing an approved event.', 409);
+    if (!Number.isInteger(action.attendees) || action.attendees < 1 || action.attendees > 500) throw new DomainError('Attendance must be a whole number from 1 to 500.');
+    const equipment = ['projector', 'wifi', 'whiteboard', 'video-conference'];
+    if (!Array.isArray(action.requiredEquipment) || !action.requiredEquipment.length || action.requiredEquipment.length > equipment.length || action.requiredEquipment.some(item => !equipment.includes(item))) throw new DomainError('Choose supported equipment requirements.');
+    if (action.notice !== undefined && (typeof action.notice !== 'string' || action.notice.length > 2000)) throw new DomainError('Keep the original notice within 2,000 characters.');
+    invalidatePlan(state, 'The event requirements changed. Prior approval cannot authorize the new proposal.');
+    state.event.attendees = action.attendees;
+    state.event.requiredEquipment = [...new Set(action.requiredEquipment)].sort();
+    const eventSource = replaceSource(state, 'event', `${state.event.title}, ${state.event.start}–${state.event.end} today. ${state.event.attendees} attendees. Assigned room: ${state.event.roomName}. Requires ${state.event.requiredEquipment.join(', ')} and step-free access.`);
+    if (action.notice) replaceSource(state, 'intake', `Organizer-reviewed source notice (untrusted text): ${action.notice}\nApplied structured requirements: ${state.event.attendees} attendees; ${state.event.requiredEquipment.join(', ')}. Accessibility and approval policy were not changed.`);
+    addActivity(state, 'librarian', 'Event requirements changed', 'Versioned the synthetic event brief. Accessibility remains a hard constraint. The agent re-evaluates every alternative from these requirements.', [cite(eventSource)]);
+    const assigned = state.rooms.find(room => room.id === state.event.roomId);
+    const assignedMeetsRequirements = assigned && assigned.available && assigned.capacity >= state.event.attendees && (!state.event.requiresAccessibility || assigned.accessible) && state.event.requiredEquipment.every(item => assigned.equipment.includes(item));
+    if (assignedMeetsRequirements) {
+      state.event.status = 'scheduled'; state.scenario = 'ready'; state.plan = null;
+    } else {
+      state.event.status = 'at_risk'; state.scenario = 'disruption';
+    }
+    if (state.event.status === 'at_risk') draftPlan(state, now);
+  } else if (action.action === 'ingest') {
     if (action.text && action.text.length > 4000) throw new DomainError('Source notes must be 4,000 characters or fewer.');
     if (state.event.status === 'relocated' && action.scenario !== 'refresh') throw new DomainError('Reset the demo to introduce a new disruption.', 409);
     if (action.scenario === 'maintenance') {
@@ -215,12 +253,36 @@ export function projectDashboard(state: CampusState, role: Role, model: Dashboar
     if (role === 'attendee') { delete projected.energyKw; projected.available = true; }
     return projected;
   });
+  const links: KnowledgeLink[] = [];
+  const link = (from: string, relation: string, to: string, ...kinds: string[]) => {
+    const refs = visibleCurrent.filter(s => kinds.includes(s.kind));
+    if (kinds.some(kind => !refs.some(s => s.kind === kind))) return;
+    links.push({ id: `link-${links.length}`, from, relation, to, citations: refs.map(cite) });
+  };
+  link(publicEvent.title, 'scheduled in', publicEvent.roomName, 'event');
+  link(publicEvent.title, 'expects', `${publicEvent.attendees} attendees`, 'event');
+  link(publicEvent.title, 'requires', publicEvent.requiredEquipment.join(', '), 'event');
+  link(publicEvent.title, 'requires', 'step-free access', 'event');
+  if (role !== 'attendee') {
+    for (const room of rooms) {
+      link(room.name, 'seats', String(room.capacity), 'rooms');
+      link(room.name, 'access', room.accessible ? 'step-free' : 'stairs only', 'rooms');
+      link(room.name, 'availability', room.available ? 'available' : 'closed', 'bookings', 'maintenance');
+    }
+    if (publicEvent.status === 'at_risk' && rooms.find(r => r.id === publicEvent.roomId)?.available === false) link('Facilities notice FM-204', 'closes', publicEvent.roomName, 'maintenance');
+    if (plan) {
+      if (plan.toRoomId && ['pending', 'approved'].includes(plan.status)) link(`Proposal ${plan.id}`, plan.status === 'approved' ? 'approved move to' : 'proposes', plan.toRoom, 'event', 'rooms', 'bookings', 'maintenance', 'policy');
+      link(`Proposal ${plan.id}`, 'requires', 'organizer approval', 'policy');
+      if (plan.internalBrief) link('Recovery agent', 'created working brief', plan.internalBrief.id, 'recovery', 'policy');
+    }
+  }
   return {
     role, revision: state.revision, simTime: now,
     scenario: role === 'attendee' && state.scenario !== 'resolved' ? 'ready' : state.scenario,
     event: publicEvent, rooms, sources: sourceProjection, plan,
     activity: state.activity.filter(a => a.roles.includes(role)).map(a => ({ ...a, citations: a.citations.filter(c => sourceProjection.some(s => s.id === c.id && s.version === c.version)) })),
-    metrics: { freshSources: visibleCurrent.filter(s => s.status === 'fresh').length, totalSources: visibleCurrent.length, linkedFacts: role === 'attendee' ? 2 : 12 + (state.event.status !== 'scheduled' ? 3 : 0), pendingApprovals: plan?.status === 'pending' ? 1 : 0 },
+    metrics: { freshSources: visibleCurrent.filter(s => s.status === 'fresh').length, totalSources: visibleCurrent.length, linkedFacts: links.length, pendingApprovals: plan?.status === 'pending' ? 1 : 0 },
+    knowledge: { links },
     model,
     capabilities: { canIngest: role !== 'attendee', canApprove: role === 'organizer', canReset: role === 'organizer' },
     snapshotSummary: role === 'attendee' ? 'Your published event details, from sources available to attendees.' : state.scenario === 'resolved' ? 'Recovery complete. Organizer approval committed both simulated actions.' : state.event.status === 'at_risk' ? 'The Brain linked a room closure to this event. The agent prepared a policy-checked response.' : 'All systems ready. Seven synthetic sources are connected to the campus Brain.',

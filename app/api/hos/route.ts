@@ -1,7 +1,7 @@
 import { env } from 'cloudflare:workers';
 import type { Answer, CampusAction, Role } from '@/lib/contracts';
 import { applyAction, buildRulesAnswer, DomainError, projectDashboard, sourcesForRole, validateAnswer } from '@/lib/engine';
-import { answerQuestion, generateExplanation, getModelConfig, type Env } from '@/lib/model';
+import { answerQuestion, generateExplanation, getModelConfig, interpretEventUpdate, ModelUnavailableError, type Env } from '@/lib/model';
 import { getSession, readState, saveState, sessionCookie, switchRole, type DemoSession, type StoreEnv } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
@@ -12,6 +12,7 @@ function json(body: unknown, status = 200, session?: DemoSession, request?: Requ
 }
 function failure(error: unknown) {
   if (error instanceof DomainError) return json({ error: error.message }, error.status);
+  if (error instanceof ModelUnavailableError) return json({ error: error.message }, 502);
   console.error('[H-OS API]', error instanceof Error ? error.message : 'Unexpected error');
   return json({ error: 'The campus service is temporarily unavailable. Please retry.' }, 500);
 }
@@ -32,6 +33,13 @@ function parseAction(body: unknown): CampusAction {
     case 'ask':
       if (typeof value.question !== 'string' || !value.question.trim() || value.question.length > 1000) throw new DomainError('Ask a question between 1 and 1,000 characters.');
       return { action: 'ask', question: value.question.trim() };
+    case 'revise_event':
+      if (typeof value.attendees !== 'number' || !Array.isArray(value.requiredEquipment)) throw new DomainError('Attendance and equipment requirements are required.');
+      if (value.notice !== undefined && (typeof value.notice !== 'string' || value.notice.length > 2000)) throw new DomainError('The notice must be text up to 2,000 characters.');
+      return { action: 'revise_event', attendees: value.attendees, requiredEquipment: value.requiredEquipment as string[], ...(typeof value.notice === 'string' ? { notice: value.notice } : {}) };
+    case 'interpret_update':
+      if (typeof value.notice !== 'string' || !value.notice.trim() || value.notice.length > 2000) throw new DomainError('Paste a synthetic update up to 2,000 characters.');
+      return { action: 'interpret_update', notice: value.notice.trim() };
     case 'reset': case 'run_agent': return { action: value.action };
     default: throw new DomainError('Unknown campus action.');
   }
@@ -69,6 +77,11 @@ export async function POST(request: Request) {
     let session = await getSession(bindings, request);
     const state = await readState(bindings, session);
     const model = getModelConfig(bindings);
+    if (action.action === 'interpret_update') {
+      if (session.role !== 'organizer') throw new DomainError('Only organizers can interpret event changes.', 403);
+      const interpretation = await interpretEventUpdate(action.notice, state.event, bindings);
+      return json({ interpretation, dashboard: projectDashboard(state, session.role, model) }, 200, session, request);
+    }
     if (action.action === 'switch_role') {
       session = await switchRole(bindings, session, action.role);
       return json(projectDashboard(state, session.role, model), 200, session, request);

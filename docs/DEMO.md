@@ -1,58 +1,35 @@
-# Campus Rescue demo guide
+# The judge controls the facts
 
-## Before the demo
+Opening line: **“A campus should adapt when facts change, without silently reusing permission from an old decision.”**
 
-- Install, build, apply the local D1 migration, and launch using the README.
-- Open the app, select the organizer role, and reset the synthetic world.
-- Confirm that the event is scheduled in the Greenhouse and no proposal is awaiting approval.
-- Seeded sources expire after two hours of real time. Reset before a fresh walkthrough, or refresh stale evidence when demonstrating the freshness gate.
-- A real local Anthropic `claude-sonnet-5-5` Q&A call was verified on 24 October 2026 with `mode: "model"` and permitted source citations. Before showing a deployed instance, verify a successful call there too. Check the actual reported model and result mode; a configured key alone does not verify model access. If it falls back, say “rules-only demo.”
-- Check the deployed URL as the intended judge identity. The site has not yet been deployed, and Sites access defaults to owner-private. Grant judges access or intentionally make it public, then test their route to the demo.
+Before every run: reset as organizer; check 48 attendees, Greenhouse and no proposal. Confirm the displayed model, then make a real extraction or cited Q&A request. “Configured” alone does not mean a model succeeded. Judge access to the hosted URL must be tested separately.
 
-## 90-second walkthrough
+## Two-minute live walkthrough
 
-| Time | Action | Suggested narration |
+| Time | Action | Say |
 | --- | --- | --- |
-| 0–12 s | Show the scheduled event and source evidence. | “Campus Rescue helps an organizer respond when the room for a campus event becomes unavailable. Everything here is synthetic.” |
-| 12–28 s | Switch to facilities and ingest the maintenance closure. | “The Librarian records a new version of the notice, links it to the Greenhouse event, and marks the event at risk.” |
-| 28–45 s | Switch to organizer and inspect the recovery proposal. | “The agent prepares an internal recovery plan. Capacity, equipment, accessibility, availability, and policy are checked in code. Each claim links back to evidence.” |
-| 45–58 s | Inspect the proposed room move and attendee message. | “The model explains the recovery and answers cited questions. The attendee message is deterministic. Both actions remain pending until the organizer approves this specific proposal.” |
-| 58–72 s | Approve the proposal. | “Approval rechecks the evidence and commits both mock actions together. No real room was booked and no message was sent.” |
-| 72–90 s | Switch to attendee and show the public update. | “The attendee sees the event's new location and public explanation. Private maintenance detail and approval controls stay outside this response. The role switch is a demo of server-side filtering.” |
+| 0–15 s | Show the campus; simulate a room closure. | “This is a synthetic campus. One room closure starts the Brain–Librarian–Agent loop.” |
+| 15–30 s | Show the saved internal brief and room matrix. | “The agent has already written its internal recovery brief. It checked every room. The Loft has enough seats but fails step-free access.” |
+| 30–55 s | Extract the default ordinary-language update: now 20 attendees, keep projector and Wi-Fi. Review the values; apply. | “The model interprets the update. We review the actual values before writing them. The agent now prefers Studio 03; the old approval is unusable.” |
+| 55–75 s | Select 90 attendees. | “Now make it impossible. No room fits. The system stops; it does not trade away accessibility or invent a booking.” |
+| 75–100 s | Select 20 attendees again; inspect Studio 03; approve. | “Only this new proposal can execute. The mock room move and announcement commit together, once.” |
+| 100–120 s | Switch to attendee; open Campus brain if time allows. | “The attendee sees the published location. The internal recovery brief, maintenance details and organizer budget never enter this role's response.” |
 
-Ingestion automatically prepares a proposal; the agent control can replan after an evidence update. Do not claim that the agent runs on a continuous background schedule.
+Invite the judge to choose another attendance or required piece of equipment. Video conferencing is deliberately absent from the room directory: requesting it blocks recovery. A whiteboard makes Agora preferable even for a small group. Energy values are synthetic estimates for the event window, not measured savings.
 
-## Evidence changed after planning
+## The strongest follow-up checks
 
-1. Reset; ingest maintenance; obtain a pending proposal.
-2. Ingest the updated maintenance/evidence scenario before approving.
-3. Observe that the old proposal is invalidated. An old approval must fail and neither mock action may execute.
-4. Run the agent again against current evidence, inspect the new proposal, and approve it.
+- Set 70 attendees before introducing a closure: the assigned room is too small, so the agent proposes Agora without fabricating a maintenance issue.
+- Update a source after planning: the old proposal is invalidated. Replan; its previous ID remains unusable.
+- Mark availability stale: the agent blocks. Refresh: new source versions restore planning if a room actually meets requirements.
+- With 90 attendees, refresh the sources: recovery stays blocked because capacity did not change.
+- In facilities role, attempt approval through the API: rejected. In attendee role, ask for private budget details: no private evidence is provided.
+- Approve twice: the second request fails. Open a fresh cookie session: it has its own campus.
 
-Suggested narration: “Approval belongs to a plan and its evidence, not to an unlimited future action.”
+## If the model or network fails
 
-## Stale evidence
+State what happened. Use structured attendance/equipment controls for the recovery loop. The UI labels rules-only explanations and answers. Do not claim a successful open-model demo when inference failed. Keep a local running instance and the public repository ready; do not pretend a recording is live.
 
-1. Reset and obtain a pending proposal from the maintenance scenario.
-2. Apply the stale-evidence scenario.
-3. Verify that approval is blocked and no mock action executes.
-4. Refresh evidence, inspect the automatically generated fresh proposal, and approve it.
+## Demo claims to keep precise
 
-## Role and execution checks
-
-| Case | Expected result |
-| --- | --- |
-| Facilities tries to approve | Server rejects the request; mock actions remain unexecuted |
-| Attendee asks about private maintenance details | Answer uses only attendee-permitted evidence and cites that evidence |
-| Attendee opens the dashboard | Operational proposal and private sources are absent from the API response |
-| An old proposal ID is submitted | Server rejects it; no change to the current event |
-| The same proposal is approved twice | At most one execution is recorded |
-| Hosted model is unavailable | Labeled rules-only explanation; deterministic eligibility and approval behavior remain available |
-| A second browser session opens the app | It has its own synthetic scenario, rather than another session's edits |
-| Reset is selected | The current session returns to its seeded event and evidence, with no pending recovery |
-
-These are behaviors to check on the actual build. Record observed results before presenting them as passed.
-
-## Reset between judges
-
-Select organizer and reset the demo. Confirm the event is scheduled in the Greenhouse, the activity is back at the seeded baseline, and there is no pending proposal. The reset affects the synthetic world for the current session. Do not clear unrelated browser data.
+The graph is a typed projection of a small structured world. The agent acts when ingestion arrives, not on a durable scheduler. Its autonomous action is an internal working brief. Human approval governs the two mock consequential effects. The role selector demonstrates server filtering, not enterprise authentication. No real campus system or person is affected.
