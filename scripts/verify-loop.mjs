@@ -18,6 +18,7 @@ function client() {
     const setCookie = response.headers.getSetCookie().find(c => c.startsWith('hos_demo='));
     if (setCookie) cookie = setCookie.split(';')[0];
     requests++;
+    if (!response.headers.get('content-type')?.includes('application/json')) throw new Error(`Expected H-OS JSON but received HTTP ${response.status}. Check the deployed Site and signed-out access before running the API walkthrough.`);
     const data = await response.json();
     assert.equal(response.status, expected, `${action?.action ?? 'GET'}: ${data.error ?? response.status}`);
     if ((data.plan?.modelUsed && data.plan.id !== previousPlanId) || data.interpretation || (data.answer && data.answer.mode !== 'rules')) observations.push({ action: action?.action, model: data.interpretation?.model ?? data.answer?.model ?? data.plan?.modelName, milliseconds: Math.round(performance.now() - start) });

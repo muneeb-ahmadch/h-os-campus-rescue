@@ -4,9 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "H·OS — Campus Rescue",
   description: "A little foresight. A calmer campus. Connected knowledge, sourced decisions and human-approved event recovery.",
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

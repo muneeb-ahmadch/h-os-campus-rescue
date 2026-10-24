@@ -36,7 +36,7 @@ The first prototype had a fixed recovery and a hardcoded linked-facts counter. A
 ## Final operational checks
 
 1. Confirm final build and hosted inference results. Configuration alone is insufficient evidence.
-2. Verify the URL as a judge: the existing audience is restricted to the owner until explicitly changed. The repository is public.
+2. Verify the URL as a judge: public access has been requested for judges. Verify it without an owner session after deployment. The repository is public.
 3. Reset and rehearse the [two-minute walkthrough](DEMO.md); keep local preview available.
 4. Confirm the host's cutoff. Work toward **22:00 PKT on 24 October 2026** because the organizer schedule lists 19:00 in Italy; the participant previously reported 19:15 / 22:15 PKT. The original event-page copy and PDF contain other date/time inconsistencies. Do not assume the later time is permission to submit late.
 5. Claim only categories supported by the submitted working build and the organizer's final rules. A numeric win probability is not measurable from the available information.

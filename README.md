@@ -1,6 +1,6 @@
 # H-OS · Campus Rescue
 
-[Live demo (access restricted)](https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site) · [Public source](https://github.com/muneeb-ahmadch/h-os-campus-rescue) · [Architecture](docs/ARCHITECTURE.md) · [Two-minute demo](docs/DEMO.md)
+[Live demo](https://hos-campus-rescue-muneeb.beigebirch2.chatgpt.site) · [Public source](https://github.com/muneeb-ahmadch/h-os-campus-rescue) · [Architecture](docs/ARCHITECTURE.md) · [Two-minute demo](docs/DEMO.md)
 
 **A campus that adapts when facts change, without reusing permission from an old decision.**
 
@@ -38,7 +38,7 @@ On **24 October 2026**, local real Gemma extraction and recovery explanations we
 - **Approval:** source fingerprint and current eligibility are rechecked; D1 compare-and-swap commits the two mock effects together, once.
 - **Three roles:** organizer, facilities and attendee are filtered on the server before data, graph relationships or prompts are returned.
 
-The role switch is deliberate **sandbox impersonation**, not enterprise authentication. Every browser cookie session has a separate synthetic world. Hosted Site access is a separate boundary; the current audience is owner-restricted until explicitly changed.
+The role switch is deliberate **sandbox impersonation**, not enterprise authentication. Every browser cookie session has a separate synthetic world. Hosted Site access is a separate boundary; the owner has made the demo public for judges. Confirm the signed-out access path on the submitted version.
 
 ## Run locally
 

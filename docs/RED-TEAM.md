@@ -30,4 +30,4 @@ The prize category to target depends on the model actually verified on the submi
 
 Confirm the organizer's actual submission cutoff and judging format. The participant previously reported 19:15 in Italy / 22:15 PKT; the organizer's published schedule lists submission at 19:00. The safest working target is 22:00 PKT on 24 October 2026. The attached brief's title slide says 31 October, another inconsistency to resolve with the host.
 
-Test the submitted URL using the intended judge's access. The existing Site is restricted to its owner until its audience is explicitly changed. Keep a local demo available if venue connectivity fails.
+Test the submitted URL using the intended judge's access. The owner authorized public access for judges; test the resulting route without an owner session after deployment. Keep a local demo available if venue connectivity fails.
