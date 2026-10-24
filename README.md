@@ -109,3 +109,7 @@ Reset before each judge. The synthetic sources expire after two real hours. Demo
 A single-event hackathon sandbox using synthetic records and mock actions. No H-FARM systems, real bookings/messages, invoices, people monitoring or scoring. No durable background agent or general-purpose document ingestion. Real deployment would need identity/role assignments, verified connectors and separately authorized integrations.
 
 Original source and documentation are [MIT licensed](LICENSE). Third-party packages and vendored files retain their own licenses and notices.
+
+The runtime model is **Google Gemma 4 26B A4B IT** (`gemma-4-26b-a4b-it` through the Gemini API). Its weights are released under Google's [Gemma 4 Apache 2.0 license](https://ai.google.dev/gemma/apache_2); see the [official Google model card](https://huggingface.co/google/gemma-4-26B-A4B-it). Hosted API access is separately governed by the [Gemini API terms](https://ai.google.dev/gemini-api/terms). We call a hosted model and do not redistribute model weights.
+
+Development used Codex AI coding assistance. The submitted runtime uses Gemma for event-update interpretation, sourced recovery explanations and role-scoped Q&A; deterministic rules govern eligibility and mock execution. The project-specific implementation and improvements were built during the Hack Day on 24 October 2026.
